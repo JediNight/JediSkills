@@ -34,8 +34,7 @@
 - [Addy Osmani - Comprehension Debt](https://addyosmani.com/blog/comprehension-debt/) — the hidden cost of code nobody understands
 - [Arcanum sec-context](https://github.com/Arcanum-Sec/sec-context) — 25+ security anti-patterns as LLM system prompt context
 - [Engineering Pitfalls in AI Coding Tools (arXiv 2603.20847)](https://arxiv.org/html/2603.20847) — 3,800+ bugs across AI coding agents
-- [Factory.ai - Context Compression Benchmark](https://www.factory.ai/blog/context-compression) — 36,611 messages, artifact trail scores 2.19-2.45/5.0
-- [Chroma - Context Rot Research](https://research.trychroma.com/context-rot) — 18 LLMs, distractor compounding, position sensitivity
-- [Stanford ACE - Agentic Context Engineering](https://arxiv.org/abs/2502.09056) — +10.6% improvement via delta updates and playbook curation
-- [ETH Zurich - LLM Context File Impact](https://arxiv.org/abs/2412.18645) — context files degrade performance ~3%, increase costs 20%+
-- [Smithery - context-degradation skill](https://smithery.ai/server/@pinkpixel/context-degradation) — detection patterns for lost-in-middle, context poisoning
+- [Factory.ai - Context Compression Benchmark](https://factory.ai/news/evaluating-compression) — 36,611 messages, artifact trail scores 2.19-2.45/5.0
+- [Chroma - Context Rot Research](https://www.trychroma.com/research/context-rot) — 18 LLMs, distractor compounding, position sensitivity
+- [Stanford ACE - Agentic Context Engineering (arXiv 2510.04618)](https://arxiv.org/abs/2510.04618) — +10.6% improvement via delta updates and playbook curation
+- [ETH Zurich - AGENTS.md Context File Impact (arXiv 2602.11988)](https://arxiv.org/abs/2602.11988) — context files degrade performance ~3%, increase costs 20%+

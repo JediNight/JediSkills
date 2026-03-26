@@ -481,6 +481,8 @@ done 2>/dev/null | head -20
 
 **Red flag:** >5% of files with dead imports/orphaned exports = significant context loss.
 
+**False positive note:** Python heuristic will flag library re-exports (`__init__.py`) and type-annotation-only imports. JS/TS detection via `tsc --noEmit` is more reliable than grep heuristics. Orphaned export detection is O(n*m) — slow on large repos; limit to `src/` directory.
+
 ### 4c. Style Drift (MEDIUM)
 
 Coding conventions shift mid-file or across the git timeline — the AI's "personality" changes when context resets.
@@ -522,6 +524,8 @@ done
 ```
 
 **Red flag:** Style shifts correlating with git timeline = context window resets.
+
+**False positive note:** Python files legitimately mix camelCase (from library APIs like `unittest.TestCase`, `setUp`) with snake_case user code. JS/TS files mix camelCase with PascalCase for React components. Only flag when the inconsistency is within user-authored code in the same language convention layer.
 
 ### 4d. Incomplete Refactors (HIGH)
 
