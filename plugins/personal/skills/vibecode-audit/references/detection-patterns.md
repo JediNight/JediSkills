@@ -387,23 +387,200 @@ fi
 
 ## Phase 4: Context Rot Indicators
 
-Detect signs that AI lost context during development:
+Detect artifacts left when AI agents lose project context. Factory.ai benchmarks (36,611 messages) show artifact trail fidelity of only 2.19-2.45/5.0 across all compression methods — agents forget what they've already built.
+
+### 4a. Contradictory Implementations (HIGH)
+
+Multiple approaches to the same concern within the same codebase. The AI forgot what pattern was established and introduced a different one.
 
 ```bash
-# Find contradictory patterns (multiple approaches to the same problem)
-echo "=== Mixed patterns ==="
-# State management
-grep -rl 'useState' --include='*.tsx' --include='*.jsx' -r | head -5 && \
-grep -rl 'useReducer\|redux\|zustand\|jotai\|recoil' --include='*.tsx' --include='*.jsx' -r | head -5
+echo "=== 4a: Contradictory Implementations ==="
 
-# Data fetching
-grep -rl 'fetch(' --include='*.ts' --include='*.tsx' -r | wc -l && echo "files using fetch()"
-grep -rl 'axios' --include='*.ts' --include='*.tsx' -r | wc -l && echo "files using axios"
-grep -rl 'useQuery\|useSWR' --include='*.ts' --include='*.tsx' -r | wc -l && echo "files using query hooks"
+# State management (JS/TS)
+echo "--- State management ---"
+for pattern in 'useState' 'useReducer' 'redux\|createSlice' 'zustand' 'jotai' 'recoil' 'mobx'; do
+  count=$(grep -rl "$pattern" --include='*.tsx' --include='*.jsx' --include='*.ts' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+  [ "$count" -gt 0 ] && echo "  $pattern: $count files"
+done
 
-# Find dead code (imports that are never used)
-grep -rn 'import.*from' --include='*.ts' --include='*.tsx' | grep -v 'node_modules' | head -30
+# Data fetching (JS/TS)
+echo "--- Data fetching ---"
+for pattern in 'fetch(' 'axios' 'useQuery\|@tanstack' 'useSWR' 'got(' 'ky('; do
+  count=$(grep -rl "$pattern" --include='*.ts' --include='*.tsx' --include='*.js' 2>/dev/null | grep -v node_modules | wc -l | tr -d ' ')
+  [ "$count" -gt 0 ] && echo "  $pattern: $count files"
+done
+
+# Error handling strategies
+echo "--- Error handling ---"
+for pattern in 'try.*catch' 'Result<\|Result\[' '\.catch(' 'ErrorBoundary' 'error_handler\|errorhandler'; do
+  count=$(grep -rl "$pattern" --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test | wc -l | tr -d ' ')
+  [ "$count" -gt 0 ] && echo "  $pattern: $count files"
+done
+
+# Config access patterns (Python)
+echo "--- Config access ---"
+for pattern in 'os\.environ\|os\.getenv' 'pydantic.*Settings\|BaseSettings' 'dotenv\|load_dotenv' 'configparser\|ConfigParser' 'dynaconf'; do
+  count=$(grep -rl "$pattern" --include='*.py' 2>/dev/null | grep -v test | wc -l | tr -d ' ')
+  [ "$count" -gt 0 ] && echo "  $pattern: $count files"
+done
+
+# Logging patterns
+echo "--- Logging ---"
+for pattern in 'console\.\(log\|error\|warn\)' 'logger\.\|logging\.' 'winston\|pino\|bunyan' 'structlog\|loguru'; do
+  count=$(grep -rl "$pattern" --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test | wc -l | tr -d ' ')
+  [ "$count" -gt 0 ] && echo "  $pattern: $count files"
+done
 ```
+
+**Red flag:** More than 1 approach per concern = context rot. The AI introduced a second approach because it forgot the first.
+
+### 4b. Lost Context Artifacts (MEDIUM)
+
+Code the AI wrote and then forgot about — dead imports, orphaned functions, unused parameters.
+
+```bash
+echo "=== 4b: Lost Context Artifacts ==="
+
+# Python: unused imports (quick heuristic)
+echo "--- Unused imports (Python) ---"
+for f in $(find . -name '*.py' -not -path '*/node_modules/*' -not -path '*/__init__.py' -not -name 'test_*' 2>/dev/null); do
+  while IFS= read -r imp; do
+    name=$(echo "$imp" | grep -oE 'import (\w+)' | awk '{print $2}')
+    [ -z "$name" ] && continue
+    uses=$(grep -c "\b${name}\b" "$f" 2>/dev/null)
+    [ "$uses" -le 1 ] && echo "  DEAD IMPORT: $name in $f"
+  done < <(grep '^from.*import\|^import ' "$f" 2>/dev/null | head -30)
+done 2>/dev/null | head -30
+
+# JS/TS: unused imports (quick heuristic — eslint or tsc is more reliable)
+echo "--- Unused imports (JS/TS) ---"
+npx tsc --noEmit 2>&1 | grep "is declared but" | head -20 || \
+  echo "  (run 'npx eslint --rule no-unused-vars:warn' for detailed detection)"
+
+# Orphaned exported functions (exported but never imported elsewhere)
+echo "--- Orphaned exports ---"
+for f in $(grep -rl 'export function\|export const\|export class\|export def' --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test | head -20); do
+  grep -oE 'export (function|const|class) (\w+)' "$f" 2>/dev/null | awk '{print $3}' | while read name; do
+    refs=$(grep -rl "\b${name}\b" --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v "$f" | grep -v node_modules | wc -l | tr -d ' ')
+    [ "$refs" -eq 0 ] && echo "  ORPHANED: $name exported from $f, imported nowhere"
+  done
+done 2>/dev/null | head -20
+
+# Unused function parameters
+echo "--- Unused parameters ---"
+grep -rn 'def .*(.*)' --include='*.py' 2>/dev/null | grep -v test | grep -v '__' | while IFS= read -r line; do
+  file=$(echo "$line" | cut -d: -f1)
+  params=$(echo "$line" | grep -oE 'def \w+\(([^)]+)\)' | sed 's/def \w+(\(.*\))/\1/' | tr ',' '\n' | grep -v 'self\|cls\|args\|kwargs' | sed 's/:.*//' | tr -d ' ')
+  for p in $params; do
+    [ -z "$p" ] && continue
+    uses=$(grep -c "\b${p}\b" "$file" 2>/dev/null)
+    [ "$uses" -le 1 ] && echo "  UNUSED PARAM: $p in $file"
+  done
+done 2>/dev/null | head -20
+```
+
+**Red flag:** >5% of files with dead imports/orphaned exports = significant context loss.
+
+### 4c. Style Drift (MEDIUM)
+
+Coding conventions shift mid-file or across the git timeline — the AI's "personality" changes when context resets.
+
+```bash
+echo "=== 4c: Style Drift ==="
+
+# Mixed naming conventions in same file
+echo "--- Mixed naming in same file ---"
+for f in $(find . -name '*.py' -not -path '*/node_modules/*' -not -name 'test_*' 2>/dev/null | head -30); do
+  camel=$(grep -cE '\b[a-z]+[A-Z][a-z]+\b' "$f" 2>/dev/null)
+  snake=$(grep -cE '\b[a-z]+_[a-z]+\b' "$f" 2>/dev/null)
+  # Python should be snake_case; camelCase presence is suspicious
+  [ "$camel" -gt 5 ] && [ "$snake" -gt 5 ] && echo "  MIXED: $f (camel: $camel, snake: $snake)"
+done
+
+for f in $(find . -name '*.ts' -name '*.js' -not -path '*/node_modules/*' -not -name '*.test.*' 2>/dev/null | head -30); do
+  camel=$(grep -cE '\b[a-z]+[A-Z][a-z]+\b' "$f" 2>/dev/null)
+  snake=$(grep -cE '\b[a-z]+_[a-z]+\b' "$f" 2>/dev/null)
+  # TS/JS should be camelCase; snake_case presence is suspicious
+  [ "$snake" -gt 5 ] && [ "$camel" -gt 5 ] && echo "  MIXED: $f (camel: $camel, snake: $snake)"
+done
+
+# Quote style inconsistency (JS/TS)
+echo "--- Quote style drift ---"
+for f in $(find . -name '*.ts' -name '*.js' -name '*.tsx' -not -path '*/node_modules/*' 2>/dev/null | head -20); do
+  singles=$(grep -cE "'" "$f" 2>/dev/null)
+  doubles=$(grep -cE '"' "$f" 2>/dev/null)
+  [ "$singles" -gt 10 ] && [ "$doubles" -gt 10 ] && echo "  MIXED QUOTES: $f (single: $singles, double: $doubles)"
+done
+
+# Indentation inconsistency
+echo "--- Indentation drift ---"
+for f in $(find . \( -name '*.ts' -o -name '*.js' -o -name '*.py' \) -not -path '*/node_modules/*' 2>/dev/null | head -30); do
+  tabs=$(grep -cP '^\t' "$f" 2>/dev/null)
+  spaces=$(grep -cP '^ {2,}' "$f" 2>/dev/null)
+  [ "$tabs" -gt 5 ] && [ "$spaces" -gt 5 ] && echo "  MIXED INDENT: $f (tabs: $tabs, spaces: $spaces)"
+done
+```
+
+**Red flag:** Style shifts correlating with git timeline = context window resets.
+
+### 4d. Incomplete Refactors (HIGH)
+
+Old pattern and new pattern coexist — the AI started a migration but forgot to finish it.
+
+```bash
+echo "=== 4d: Incomplete Refactors ==="
+
+# Find migration artifacts: old and new versions of the same module/function
+echo "--- Old/new file pairs ---"
+find . -name '*.old.*' -o -name '*.bak.*' -o -name '*.deprecated.*' -o -name '*_old.*' -o -name '*_backup.*' -o -name '*_v2.*' 2>/dev/null | grep -v node_modules
+
+# Find TODO/FIXME referencing migration or refactoring
+echo "--- Unfinished migration TODOs ---"
+grep -rn 'TODO.*migrat\|TODO.*refactor\|TODO.*deprecat\|FIXME.*old\|FIXME.*legacy\|TODO.*remove.*old' --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | head -15
+
+# Find deprecated imports still in use
+echo "--- Deprecated imports still used ---"
+grep -rn 'from.*deprecated\|from.*legacy\|from.*old' --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test | head -10
+
+# Detect split-brain: same entity defined in two places
+echo "--- Duplicate definitions ---"
+grep -rn 'class \w\+\|interface \w\+\|type \w\+ =' --include='*.ts' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test | awk -F'[ :{]' '{print $NF}' | sort | uniq -c | sort -rn | awk '$1 > 1 {print "  DUPLICATE DEF: " $2 " (" $1 " definitions)"}'
+```
+
+**Red flag:** Coexisting old/new patterns in the same layer = the AI forgot to complete the migration.
+
+### 4e. Session Boundary Artifacts (MEDIUM)
+
+Signs of context window resets visible in git history — the AI re-introduced something it had already built.
+
+```bash
+echo "=== 4e: Session Boundary Artifacts ==="
+
+# Functions that were deleted and re-added (context loss indicator)
+echo "--- Deleted-then-recreated code ---"
+git log --all --diff-filter=D --name-only --pretty=format: -- '*.ts' '*.js' '*.py' 2>/dev/null | sort -u | while read f; do
+  [ -z "$f" ] && continue
+  [ -f "$f" ] && echo "  RESURRECTED: $f (was deleted, now exists again)"
+done | head -10
+
+# Large commit spikes (context window reset often followed by large regeneration)
+echo "--- Sudden large diffs (session resets) ---"
+git log --oneline --shortstat -30 2>/dev/null | grep -B1 -E '[0-9]{3,} insertion' | grep -v '^--$' | head -15
+
+# Same utility re-implemented in different files (AI forgot it already existed)
+echo "--- Potential re-implementations ---"
+for util in 'formatDate\|format_date' 'slugify' 'debounce' 'throttle' 'deepClone\|deep_copy' 'isEqual\|deep_equal' 'retry' 'sleep\|delay' 'hash\|hashCode'; do
+  files=$(grep -rl "$util" --include='*.ts' --include='*.js' --include='*.py' 2>/dev/null | grep -v node_modules | grep -v test)
+  count=$(echo "$files" | grep -c . 2>/dev/null)
+  [ "$count" -gt 1 ] && echo "  RE-IMPLEMENTED: '$util' appears in $count files — AI may have forgotten it already existed"
+done
+
+# Detect AI co-author signature gaps (sessions where AI tool changed or was restarted)
+echo "--- Session breaks in AI co-author trail ---"
+git log --all --format='%H|%s|%an' -50 2>/dev/null | grep -iE 'claude|copilot|cursor|ai|bot' | head -20
+```
+
+**Red flag:** Utility functions implemented in multiple files, or files deleted and recreated = the AI lost track of what exists.
 
 ---
 

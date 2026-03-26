@@ -58,7 +58,15 @@ Verify all dependencies actually exist on their registries. 21.7% of AI-suggeste
 
 ### Phase 4: Context Rot Indicators
 
-Detect contradictory patterns (mixed state management, mixed data fetching libraries), dead imports, and signs the AI lost project context mid-session.
+Detect artifacts left when AI agents lose project context during long sessions, after context window compaction, or across multiple coding sessions. Factory.ai benchmarks (36,611 messages) show compaction preserves only 2.19-2.45/5.0 artifact trail fidelity — agents systematically forget what they've already built.
+
+| Sub-Pattern | Signal | Severity |
+|-------------|--------|----------|
+| 4a. Contradictory Implementations | Multiple approaches to same concern in same codebase | HIGH |
+| 4b. Lost Context Artifacts | Dead imports, orphaned functions, unused parameters | MEDIUM |
+| 4c. Style Drift | Naming convention or code style shifts mid-file or across timeline | MEDIUM |
+| 4d. Incomplete Refactors | Old and new pattern coexisting when migration should be complete | HIGH |
+| 4e. Session Boundary Artifacts | Re-implementations of existing code, sudden convention changes in git timeline | MEDIUM |
 
 ### Phase 5: Cognitive Debt Assessment
 
@@ -70,7 +78,7 @@ Find files with high complexity but no explanatory comments — code that runs b
 1. **Phase 1** (Fingerprinting): ~30s. Determines audit depth.
 2. **Phase 3** (Slopsquatting): Run early — supply chain risk. May be slow due to network calls.
 3. **Phase 2** (Anti-Patterns): Run CRITICAL patterns first (#1, #2, #5, #10, #13, #17), then HIGH, then MEDIUM.
-4. **Phase 4** (Context Rot): Quick — mostly grep-based.
+4. **Phase 4** (Context Rot): Expanded — grep-based plus git timeline analysis. Sub-patterns 4a and 4d are highest signal.
 5. **Phase 5** (Cognitive Debt): Last — least actionable.
 
 **Large repos (>1000 files)**: Focus greps on `src/` or `app/` rather than repo root. Use `--include` filters aggressively. Skip Phase 5 unless specifically requested.
@@ -130,6 +138,9 @@ Find files with high complexity but no explanatory comments — code that runs b
 | Code truncation markers | X | 0 | PASS/FAIL |
 | High-churn files (2wk) | X | <3 files with >5 commits | PASS/FAIL |
 | Single-impl abstractions | X | 0 unnecessary | PASS/FAIL |
+| Contradictory pattern pairs | X | 0 | PASS/FAIL |
+| Dead imports / orphaned functions | X | <5% of files | PASS/FAIL |
+| Incomplete refactor layers | X | 0 | PASS/FAIL |
 ```
 
 ## References

@@ -14,6 +14,10 @@
 - **45% of AI-generated code** contains security vulnerabilities (Georgetown CSET)
 - AI-assisted devs scored **17% lower** on comprehension quizzes (Anthropic, 52 engineers)
 - Code churn **doubled** and copy-pasted code rose **48%** in AI-assisted repos (CMU/GitClear, 807 repos)
+- Context compaction preserves only **2.19-2.45/5.0 artifact trail fidelity** across all methods (Factory.ai, 36,611 messages)
+- LLM-generated context files **degrade agent performance by ~3%** and increase inference costs **20%+** (ETH Zurich)
+- **Distractors compound non-uniformly** in context — multiple irrelevant items degrade performance more than linearly (Chroma, 18 LLMs)
+- **Focused prompts significantly outperform full prompts** across all models in long-context tasks (LongMemEval)
 
 ## Sources
 
@@ -30,3 +34,8 @@
 - [Addy Osmani - Comprehension Debt](https://addyosmani.com/blog/comprehension-debt/) — the hidden cost of code nobody understands
 - [Arcanum sec-context](https://github.com/Arcanum-Sec/sec-context) — 25+ security anti-patterns as LLM system prompt context
 - [Engineering Pitfalls in AI Coding Tools (arXiv 2603.20847)](https://arxiv.org/html/2603.20847) — 3,800+ bugs across AI coding agents
+- [Factory.ai - Context Compression Benchmark](https://www.factory.ai/blog/context-compression) — 36,611 messages, artifact trail scores 2.19-2.45/5.0
+- [Chroma - Context Rot Research](https://research.trychroma.com/context-rot) — 18 LLMs, distractor compounding, position sensitivity
+- [Stanford ACE - Agentic Context Engineering](https://arxiv.org/abs/2502.09056) — +10.6% improvement via delta updates and playbook curation
+- [ETH Zurich - LLM Context File Impact](https://arxiv.org/abs/2412.18645) — context files degrade performance ~3%, increase costs 20%+
+- [Smithery - context-degradation skill](https://smithery.ai/server/@pinkpixel/context-degradation) — detection patterns for lost-in-middle, context poisoning
