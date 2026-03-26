@@ -1,0 +1,17 @@
+{
+  "name": "jedi-skills",
+  "owner": {
+    "name": "JediNight"
+  },
+  "metadata": {
+    "description": "Personal Claude Code skills and commands",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "personal",
+      "source": "./plugins/personal",
+      "description": "Custom skills and commands"
+    }
+  ]
+}
